@@ -44,6 +44,7 @@ def dq02_company_year_uniqueness(df, table_name):
 
     return failures
 
+
 def dq03_fk_integrity(df, table_name, valid_company_ids):
     """
     DQ-03: Foreign key integrity
@@ -73,15 +74,12 @@ def dq03_fk_integrity(df, table_name, valid_company_ids):
 def dq04_balance_sheet_balance(df):
     """
     DQ-04: Balance Sheet Balance Check
-    Assets and Liabilities should differ by less than 1%
     """
 
-    required_cols = [
-        "total_liabilities",
-        "total_assets"
-    ]
-
-    if not all(col in df.columns for col in required_cols):
+    if (
+        "total_liabilities" not in df.columns
+        or "total_assets" not in df.columns
+    ):
         return []
 
     failures = []
@@ -116,11 +114,10 @@ def dq04_balance_sheet_balance(df):
 
     return failures
 
+
 def dq05_opm_crosscheck(df):
     """
     DQ-05: OPM Cross Check
-    OPM should match:
-    (operating_profit / sales) * 100
     """
 
     required_cols = [
@@ -140,15 +137,14 @@ def dq05_opm_crosscheck(df):
         op = row["operating_profit"]
         opm = row["opm_percentage"]
 
-        # Handle values stored as 2214 = 22.14%
-        if opm > 100:
-            opm = opm / 100
-
         if pd.isna(sales) or pd.isna(op) or pd.isna(opm):
             continue
 
         if sales == 0:
             continue
+
+        if opm > 100:
+            opm = opm / 100
 
         calculated_opm = (op / sales) * 100
 
@@ -165,6 +161,7 @@ def dq05_opm_crosscheck(df):
             })
 
     return failures
+
 
 def dq06_positive_sales(df):
     """
@@ -188,7 +185,178 @@ def dq06_positive_sales(df):
             "message": f"Non-positive sales: {row['sales']}"
         })
 
-    return failures 
+    return failures
+
+
+def dq07_tax_rate_range(df):
+    """
+    DQ-07: Tax Rate Range Check
+    """
+
+    if "tax_percentage" not in df.columns:
+        return []
+
+    failures = []
+
+    invalid_rows = df[
+        (df["tax_percentage"] < -100)
+        | (df["tax_percentage"] > 100)
+    ]
+
+    for _, row in invalid_rows.iterrows():
+
+        failures.append({
+            "rule_id": "DQ-07",
+            "severity": "WARNING",
+            "table_name": "profitandloss",
+            "record_id": row["id"],
+            "message": f"Invalid tax rate: {row['tax_percentage']}"
+        })
+
+    return failures
+
+def dq08_net_cash_flow_check(df):
+    """
+    DQ-08: Net Cash Flow Validation
+    """
+
+    required_cols = [
+        "operating_activity",
+        "investing_activity",
+        "financing_activity",
+        "net_cash_flow"
+    ]
+
+    if not all(col in df.columns for col in required_cols):
+        return []
+
+    failures = []
+
+    for _, row in df.iterrows():
+
+        calculated = (
+            row["operating_activity"]
+            + row["investing_activity"]
+            + row["financing_activity"]
+        )
+
+        reported = row["net_cash_flow"]
+
+        if pd.isna(calculated) or pd.isna(reported):
+            continue
+
+        difference = abs(calculated - reported)
+
+        if difference > 1:
+
+            failures.append({
+                "rule_id": "DQ-08",
+                "severity": "WARNING",
+                "table_name": "cashflow",
+                "record_id": row["id"],
+                "message": f"Net cash mismatch {difference:.2f}"
+            })
+
+    return failures
+
+def dq09_dividend_payout(df):
+    """
+    DQ-09: Dividend payout must be non-negative
+    """
+
+    if "dividend_payout" not in df.columns:
+        return []
+
+    failures = []
+
+    invalid_rows = df[
+        df["dividend_payout"] < 0
+    ]
+
+    for _, row in invalid_rows.iterrows():
+
+        failures.append({
+            "rule_id": "DQ-09",
+            "severity": "WARNING",
+            "table_name": "profitandloss",
+            "record_id": row["id"],
+            "message": f"Negative dividend payout: {row['dividend_payout']}"
+        })
+
+    return failures
+
+def dq10_eps_range(df):
+    """
+    DQ-10: EPS Range Check
+    """
+
+    if "eps" not in df.columns:
+        return []
+
+    failures = []
+
+    invalid_rows = df[
+        (df["eps"] < -1000)
+        | (df["eps"] > 1000)
+    ]
+
+    for _, row in invalid_rows.iterrows():
+
+        failures.append({
+            "rule_id": "DQ-10",
+            "severity": "WARNING",
+            "table_name": "profitandloss",
+            "record_id": row["id"],
+            "message": f"Suspicious EPS: {row['eps']}"
+        })
+
+    return failures
+
+def dq11_total_liabilities_check(df):
+    """
+    DQ-11: Total Liabilities Validation
+    """
+
+    required_cols = [
+        "equity_capital",
+        "reserves",
+        "borrowings",
+        "other_liabilities",
+        "total_liabilities"
+    ]
+
+    if not all(col in df.columns for col in required_cols):
+        return []
+
+    failures = []
+
+    for _, row in df.iterrows():
+
+        calculated = (
+            row["equity_capital"]
+            + row["reserves"]
+            + row["borrowings"]
+            + row["other_liabilities"]
+        )
+
+        reported = row["total_liabilities"]
+
+        if pd.isna(calculated) or pd.isna(reported):
+            continue
+
+        difference = abs(calculated - reported)
+
+        if difference > 1:
+
+            failures.append({
+                "rule_id": "DQ-11",
+                "severity": "WARNING",
+                "table_name": "balancesheet",
+                "record_id": row["id"],
+                "message": f"Liabilities mismatch {difference:.2f}"
+            })
+
+    return failures
 
 def main():
 
@@ -199,9 +367,7 @@ def main():
         header=1
     )
 
-    valid_company_ids = set(
-        companies_df["id"]
-    )
+    valid_company_ids = set(companies_df["id"])
 
     files = {
         "companies": pd.read_excel("data/raw/companies.xlsx", header=1),
@@ -234,6 +400,10 @@ def main():
                 dq04_balance_sheet_balance(df)
             )
 
+            failures.extend(
+                dq11_total_liabilities_check(df)
+            )
+
         if table_name == "profitandloss":
 
             failures.extend(
@@ -242,6 +412,23 @@ def main():
 
             failures.extend(
                 dq06_positive_sales(df)
+            )
+
+            failures.extend(
+                dq07_tax_rate_range(df)
+            )
+            failures.extend(
+                dq09_dividend_payout(df)
+            )
+
+            failures.extend(
+                dq10_eps_range(df)
+            )
+        
+        if table_name == "cashflow":
+
+            failures.extend(
+                dq08_net_cash_flow_check(df)
             )
 
     pd.DataFrame(failures).to_csv(
