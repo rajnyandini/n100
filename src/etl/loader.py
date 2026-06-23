@@ -1,6 +1,10 @@
 import pandas as pd
+import sqlite3
 import re
 from pathlib import Path
+
+
+DB_PATH = "db/nifty100.db"
 
 
 def normalize_year(year):
@@ -42,38 +46,70 @@ def normalize_ticker(ticker):
 
 def load_excel(file_path):
     """
-    Load excel with header row = 1
+    Load Excel file with header row = 1
     """
 
     return pd.read_excel(file_path, header=1)
 
 
-def load_all_core_files(data_dir):
-    """
-    Load all 7 core datasets.
-    """
+def load_to_sqlite():
+
+    conn = sqlite3.connect(DB_PATH)
 
     files = {
-        "companies": "companies.xlsx",
-        "profitandloss": "profitandloss.xlsx",
-        "balancesheet": "balancesheet.xlsx",
-        "cashflow": "cashflow.xlsx",
-        "analysis": "analysis.xlsx",
-        "documents": "documents.xlsx",
-        "prosandcons": "prosandcons.xlsx"
+        "companies": "data/raw/companies.xlsx",
+        "profitandloss": "data/raw/profitandloss.xlsx",
+        "balancesheet": "data/raw/balancesheet.xlsx",
+        "cashflow": "data/raw/cashflow.xlsx",
+        "analysis": "data/raw/analysis.xlsx",
+        "documents": "data/raw/documents.xlsx",
+        "prosandcons": "data/raw/prosandcons.xlsx",
+        "sectors": "data/raw/supporting/sectors.xlsx",
+        "stock_prices": "data/raw/supporting/stock_prices.xlsx",
+        "financial_ratios": "data/raw/supporting/financial_ratios.xlsx",
+        "peer_groups": "data/raw/supporting/peer_groups.xlsx",
+        "market_cap": "data/raw/supporting/market_cap.xlsx"
     }
 
-    datasets = {}
+    audit = []
 
-    for name, file in files.items():
-        path = Path(data_dir) / file
-        datasets[name] = load_excel(path)
+    for table_name, file_path in files.items():
 
-    return datasets
+        print(f"Loading {table_name}...")
+
+        if "supporting" in file_path:
+            df = pd.read_excel(file_path)
+        else:
+            df = pd.read_excel(file_path, header=1)
+
+        df.to_sql(
+            table_name,
+            conn,
+            if_exists="append",
+            index=False
+        )
+
+        audit.append({
+            "table_name": table_name,
+            "rows_loaded": len(df),
+            "rows_rejected": 0
+        })
+
+        print(f"Loaded {len(df)} rows")
+
+    audit_df = pd.DataFrame(audit)
+
+    audit_df.to_csv(
+        "output/load_audit.csv",
+        index=False
+    )
+
+    conn.commit()
+    conn.close()
+
+    print("\nData loaded successfully")
+    print("load_audit.csv generated")
 
 
 if __name__ == "__main__":
-    datasets = load_all_core_files("data/raw")
-
-    for name, df in datasets.items():
-        print(f"{name}: {df.shape}")
+    load_to_sqlite()

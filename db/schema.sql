@@ -79,8 +79,8 @@ CREATE TABLE analysis (
 CREATE TABLE documents (
     id INTEGER PRIMARY KEY,
     company_id TEXT,
-    document_name TEXT,
-    document_link TEXT,
+    Year INTEGER,
+    Annual_Report TEXT,
     FOREIGN KEY (company_id)
         REFERENCES companies(id)
 );
