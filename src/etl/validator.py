@@ -358,6 +358,184 @@ def dq11_total_liabilities_check(df):
 
     return failures
 
+def dq12_url_validation(df):
+    """
+    DQ-12: URL Validation
+    """
+
+    url_columns = [
+        "website",
+        "company_logo",
+        "chart_link",
+        "nse_profile",
+        "bse_profile"
+    ]
+
+    failures = []
+
+    for col in url_columns:
+
+        if col not in df.columns:
+            continue
+
+        invalid_rows = df[
+            ~df[col].astype(str).str.startswith(
+                ("http://", "https://"),
+                na=False
+            )
+        ]
+
+        for _, row in invalid_rows.iterrows():
+
+            failures.append({
+                "rule_id": "DQ-12",
+                "severity": "WARNING",
+                "table_name": "companies",
+                "record_id": row["id"],
+                "message": f"Invalid URL in {col}"
+            })
+
+    return failures
+
+def dq13_total_assets_check(df):
+    """
+    DQ-13: Total Assets Validation
+    """
+
+    required_cols = [
+        "fixed_assets",
+        "cwip",
+        "investments",
+        "other_asset",
+        "total_assets"
+    ]
+
+    if not all(col in df.columns for col in required_cols):
+        return []
+
+    failures = []
+
+    for _, row in df.iterrows():
+
+        calculated = (
+            row["fixed_assets"]
+            + row["cwip"]
+            + row["investments"]
+            + row["other_asset"]
+        )
+
+        reported = row["total_assets"]
+
+        if pd.isna(calculated) or pd.isna(reported):
+            continue
+
+        difference = abs(calculated - reported)
+
+        if difference > 1:
+
+            failures.append({
+                "rule_id": "DQ-13",
+                "severity": "WARNING",
+                "table_name": "balancesheet",
+                "record_id": row["id"],
+                "message": f"Assets mismatch {difference:.2f}"
+            })
+
+    return failures
+
+def dq14_coverage_check(df):
+    """
+    DQ-14: Company must have at least 5 years of data
+    """
+
+    if "company_id" not in df.columns:
+        return []
+
+    coverage = (
+        df.groupby("company_id")["year"]
+        .count()
+        .reset_index()
+    )
+
+    failures = []
+
+    invalid_companies = coverage[
+        coverage["year"] < 5
+    ]
+
+    for _, row in invalid_companies.iterrows():
+
+        failures.append({
+            "rule_id": "DQ-14",
+            "severity": "WARNING",
+            "table_name": "profitandloss",
+            "record_id": row["company_id"],
+            "message": f"Only {row['year']} years of data"
+        })
+
+    return failures
+
+def dq15_mandatory_fields(df):
+    """
+    DQ-15: Mandatory Fields Check
+    """
+
+    required_columns = [
+        "id",
+        "company_name",
+        "website"
+    ]
+
+    failures = []
+
+    for col in required_columns:
+
+        if col not in df.columns:
+            continue
+
+        invalid_rows = df[
+            df[col].isna()
+        ]
+
+        for _, row in invalid_rows.iterrows():
+
+            failures.append({
+                "rule_id": "DQ-15",
+                "severity": "WARNING",
+                "table_name": "companies",
+                "record_id": row["id"],
+                "message": f"Missing value in {col}"
+            })
+
+    return failures
+
+def dq16_roe_range(df):
+    """
+    DQ-16: ROE Range Check
+    """
+
+    if "roe_percentage" not in df.columns:
+        return []
+
+    failures = []
+
+    invalid_rows = df[
+        (df["roe_percentage"] < -100)
+        | (df["roe_percentage"] > 100)
+    ]
+
+    for _, row in invalid_rows.iterrows():
+
+        failures.append({
+            "rule_id": "DQ-16",
+            "severity": "WARNING",
+            "table_name": "companies",
+            "record_id": row["id"],
+            "message": f"Invalid ROE: {row['roe_percentage']}"
+        })
+
+    return failures
+
 def main():
 
     failures = []
@@ -404,6 +582,10 @@ def main():
                 dq11_total_liabilities_check(df)
             )
 
+            failures.extend(
+                dq13_total_assets_check(df)
+            )
+
         if table_name == "profitandloss":
 
             failures.extend(
@@ -424,11 +606,29 @@ def main():
             failures.extend(
                 dq10_eps_range(df)
             )
+
+            failures.extend(
+                dq14_coverage_check(df)
+            )
         
         if table_name == "cashflow":
 
             failures.extend(
                 dq08_net_cash_flow_check(df)
+            )
+
+        if table_name == "companies":
+
+            failures.extend(
+                dq12_url_validation(df)
+            )
+
+            failures.extend(
+                dq15_mandatory_fields(df)
+            )
+
+            failures.extend(
+                dq16_roe_range(df)
             )
 
     pd.DataFrame(failures).to_csv(
