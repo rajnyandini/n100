@@ -180,6 +180,14 @@ def compute_kpis(row):
         row["reserves"],
     )
 
+    # Day 13 - High leverage flag
+    if is_financial_company(row):
+        high_leverage = False
+    else:
+        high_leverage = (
+            de is not None and de > 5
+        )
+
     icr = interest_coverage_ratio(
         row["operating_profit"],
         row["other_income"],
@@ -238,6 +246,8 @@ def compute_kpis(row):
 
         "debt_to_equity": de,
 
+        "high_leverage_flag": high_leverage,
+
         "interest_coverage": icr,
 
         "asset_turnover": turnover,
@@ -281,6 +291,118 @@ def build_ratio_table(df):
 
     return result
 
+def validate_ratios(df, result):
+    """
+    Compare calculated ratios with source ratios.
+    Returns a list of validation issues.
+    """
+
+    issues = []
+
+
+    merged = result.merge(
+        df[[
+            "company_id",
+            "year",
+            "roe_percentage",
+            "roce_percentage",
+            "broad_sector"
+        ]],
+        on=["company_id", "year"],
+        how="left"
+    )
+
+    for _, row in merged.iterrows():
+
+        calc_roe = row["return_on_equity_pct"]
+        source_roe = row["roe_percentage"]
+
+        calc_roce = row["roce"]
+        source_roce = row["roce_percentage"]
+
+        if (
+            pd.notna(calc_roce)
+            and pd.notna(source_roce)
+        ):
+
+            difference = abs(calc_roce - source_roce)
+
+            if difference > 5:
+
+                issues.append({
+                    "company_id": row["company_id"],
+                    "year": row["year"],
+                    "metric": "ROCE",
+                    "calculated": calc_roce,
+                    "source": source_roce,
+                    "difference": difference,
+                    "category": "Formula discrepancy",
+                })
+
+        if (
+            pd.notna(calc_roe)
+            and pd.notna(source_roe)
+        ):
+
+            difference = abs(calc_roe - source_roe)
+
+            if difference > 5:
+
+                issues.append({
+                    "company_id": row["company_id"],
+                    "year": row["year"],
+                    "metric": "ROE",
+                    "calculated": calc_roe,
+                    "source": source_roe,
+                    "difference": difference,
+                    "category": "Formula discrepancy",
+                })
+
+    return issues
+
+def write_validation_log(issues):
+    """
+    Write validation issues to output/ratio_edge_cases.log
+    """
+
+    with open(
+        "output/ratio_edge_cases.log",
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        f.write("Financial Ratio Validation Report\n")
+        f.write("=" * 60 + "\n\n")
+
+        if not issues:
+            f.write("No validation issues found.\n")
+            return
+
+        for issue in issues:
+
+            f.write(
+                f"{issue['company_id']} | "
+                f"{issue['year']} | "
+                f"{issue['metric']}\n"
+            )
+
+            f.write(
+                f"Calculated : {issue['calculated']:.2f}\n"
+            )
+
+            f.write(
+                f"Source     : {issue['source']:.2f}\n"
+            )
+
+            f.write(
+                f"Difference : {issue['difference']:.2f}\n"
+            )
+
+            f.write(
+                f"Category   : {issue['category']}\n"
+            )
+
+            f.write("-" * 60 + "\n")
 
 def save_to_database(result):
 
@@ -350,6 +472,13 @@ if __name__ == "__main__":
     print("\nComputing KPIs...")
 
     result = build_ratio_table(df)
+
+    issues = validate_ratios(df, result)
+
+    write_validation_log(issues)
+
+    print(f"\nValidation issues : {len(issues)}")
+    print("Validation log saved to output/ratio_edge_cases.log")
 
     print("\nPreview")
     print(result.head())
