@@ -134,6 +134,12 @@ def prepare_data():
 
     return merged
 
+def is_financial_company(row):
+    """
+    Returns True if the company belongs
+    to the Financials sector.
+    """
+    return row["broad_sector"] == "Financials"
 
 def compute_kpis(row):
 
