@@ -19,10 +19,18 @@ from src.analytics.ratios import (
     debt_to_equity,
     interest_coverage_ratio,
     asset_turnover,
+    icr_label,
+    icr_warning_flag,
 )
 
 from src.analytics.cashflow_kpis import (
     free_cash_flow,
+    cfo_quality_ratio,
+    cfo_quality_label,
+    capex_intensity,
+    capex_label,
+    fcf_conversion_rate,
+    capital_allocation_pattern,
 )
 
 from src.analytics.cagr import (
@@ -132,6 +140,18 @@ def prepare_data():
         errors="ignore",
     )
 
+    # Extract numeric year (TTM becomes NaN)
+    merged["year_num"] = (
+        merged["year"]
+        .str.extract(r"(\d{4})")[0]
+    )
+
+    merged["year_num"] = pd.to_numeric(
+        merged["year_num"],
+        errors="coerce"
+    )
+
+    
     return merged
 
 def is_financial_company(row):
@@ -141,7 +161,7 @@ def is_financial_company(row):
     """
     return row["broad_sector"] == "Financials"
 
-def compute_kpis(row):
+def compute_kpis(row, company_history):
 
     # ---------- Basic KPIs ----------
 
@@ -194,6 +214,10 @@ def compute_kpis(row):
         row["interest"],
     )
 
+    icr_category = icr_label(icr)
+
+    icr_warning = icr_warning_flag(icr)
+
     turnover = asset_turnover(
         row["sales"],
         row["total_assets"],
@@ -210,10 +234,69 @@ def compute_kpis(row):
         else None
     )
 
-    # ---------- Placeholder CAGR ----------
+    # ---------- Cash Flow KPIs ----------
+
+    cfo_quality = cfo_quality_ratio(
+        row["operating_activity"],
+        row["net_profit"],
+    )
+
+    cfo_quality_category = cfo_quality_label(
+        cfo_quality,
+    )
+
+    capex_intensity_pct = capex_intensity(
+        row["investing_activity"],
+        row["sales"],
+    )
+
+    capex_category = capex_label(
+        capex_intensity_pct,
+    )
+
+    fcf_conversion_pct = fcf_conversion_rate(
+        fcf,
+        row["operating_profit"],
+    )
+
+    capital_pattern = capital_allocation_pattern(
+        row["operating_activity"],
+        row["investing_activity"],
+        row["financing_activity"],
+        cfo_quality,
+    )
+
+    # ---------- CAGR ----------
+
     revenue_cagr = None
     pat_cagr = None
     eps_cagr = None
+
+    past_row = company_history[
+        company_history["year_num"] == row["year_num"] - 5
+    ]
+
+    if not past_row.empty:
+
+        past = past_row.iloc[0]
+
+        revenue_cagr, _ = calculate_cagr(
+            past["sales"],
+            row["sales"],
+            5,
+        )
+
+        pat_cagr, _ = calculate_cagr(
+            past["net_profit"],
+            row["net_profit"],
+            5,
+        )
+
+        eps_cagr, _ = calculate_cagr(
+            past["eps"],
+            row["eps"],
+            5,
+        )
 
     # ---------- Composite Score ----------
     score = 0
@@ -248,13 +331,23 @@ def compute_kpis(row):
 
         "high_leverage_flag": high_leverage,
 
-        "interest_coverage": icr,
-
         "asset_turnover": turnover,
 
         "free_cash_flow_cr": fcf,
 
         "capex_cr": capex,
+
+        "cfo_quality_ratio": cfo_quality,
+
+        "cfo_quality_label": cfo_quality_category,
+
+        "capex_intensity_pct": capex_intensity_pct,
+
+        "capex_label": capex_category,
+
+        "fcf_conversion_pct": fcf_conversion_pct,
+
+        "capital_allocation_pattern": capital_pattern,
 
         "earnings_per_share": row["eps"],
 
@@ -277,15 +370,36 @@ def compute_kpis(row):
         # Used later in Day 13
         "roa": roa,
         "roce": roce,
-    }
+        "cfo_sign": "+" if row["operating_activity"] >= 0 else "-",
+
+        "cfi_sign": "+" if row["investing_activity"] >= 0 else "-",
+
+        "cff_sign": "+" if row["financing_activity"] >= 0 else "-",
+
+        "pattern_label": capital_pattern,
+        "interest_coverage": icr,
+
+        "icr_label": icr_category,
+
+        "icr_warning_flag": icr_warning,
+            }
 
 
 def build_ratio_table(df):
 
+    df = df.sort_values(
+        by=["company_id", "year_num"]
+    )
+
     rows = []
 
-    for _, row in df.iterrows():
-        rows.append(compute_kpis(row))
+    for company_id, company_history in df.groupby("company_id"):
+
+        for _, row in company_history.iterrows():
+
+            rows.append(
+                compute_kpis(row, company_history)
+            )
 
     result = pd.DataFrame(rows)
 
@@ -404,6 +518,25 @@ def write_validation_log(issues):
 
             f.write("-" * 60 + "\n")
 
+def save_capital_allocation(result):
+
+    capital_df = result[
+        [
+            "company_id",
+            "year",
+            "cfo_sign",
+            "cfi_sign",
+            "cff_sign",
+            "pattern_label",
+        ]
+    ]
+
+    capital_df.to_csv(
+        "output/capital_allocation.csv",
+        index=False,
+    )
+
+
 def save_to_database(result):
 
     # Keep only columns that exist in financial_ratios
@@ -481,8 +614,23 @@ if __name__ == "__main__":
     print("Validation log saved to output/ratio_edge_cases.log")
 
     print("\nPreview")
-    print(result.head())
+    print(
+        result[
+            [
+                "company_id",
+                "year",
+                "cfo_quality_ratio",
+                "cfo_quality_label",
+                "capex_intensity_pct",
+                "capex_label",
+                "fcf_conversion_pct",
+                "capital_allocation_pattern",
+                ]
+        ].head(20)
+    )
 
     save_to_database(result)
+
+    save_capital_allocation(result)
 
     print("\nDone.")

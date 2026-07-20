@@ -248,3 +248,45 @@ def asset_turnover(
         return None
 
     return sales / total_assets
+
+
+def net_debt(total_debt, cash):
+    """
+    Net Debt = Total Debt - Cash
+    """
+    if total_debt is None or cash is None:
+        return None
+
+    return total_debt - cash
+
+
+def icr_label(icr):
+    """
+    Categorize Interest Coverage Ratio.
+    """
+    if icr is None:
+        return None
+
+    if icr < 0:
+        return "Loss Making"
+
+    if icr == float("inf"):
+        return "Debt Free"
+
+    if icr < 1.5:
+        return "Danger"
+
+    if icr < 3:
+        return "Moderate"
+
+    return "Healthy"
+
+
+def icr_warning_flag(icr):
+    """
+    True if Interest Coverage Ratio is risky.
+    """
+    if icr is None:
+        return False
+
+    return icr < 1.5
