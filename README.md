@@ -1,3 +1,11 @@
+![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)
+![Pandas](https://img.shields.io/badge/Pandas-Data_Analysis-150458?logo=pandas)
+![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite)
+![Plotly](https://img.shields.io/badge/Plotly-Visualization-3F4F75?logo=plotly)
+![GitHub last commit](https://img.shields.io/github/last-commit/rajnyandini/n100)
+![GitHub repo size](https://img.shields.io/github/repo-size/rajnyandini/n100)
+![GitHub issues](https://img.shields.io/github/issues/rajnyandini/n100)
+![Status](https://img.shields.io/badge/Status-Active_Development-orange)
 # N100 Financial Intelligence Platform
 
 A comprehensive financial intelligence platform designed to collect, validate, process, and analyze financial data for NIFTY 100 companies. The project focuses on building a reliable data pipeline that transforms raw financial statements into structured datasets for analytical and business intelligence applications.
