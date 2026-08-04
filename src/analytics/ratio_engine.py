@@ -151,8 +151,8 @@ def prepare_data():
         errors="coerce"
     )
 
-    
     return merged
+
 
 def is_financial_company(row):
     """
@@ -160,6 +160,7 @@ def is_financial_company(row):
     to the Financials sector.
     """
     return row["broad_sector"] == "Financials"
+
 
 def compute_kpis(row, company_history):
 
@@ -268,37 +269,100 @@ def compute_kpis(row, company_history):
 
     # ---------- CAGR ----------
 
-    revenue_cagr = None
-    pat_cagr = None
-    eps_cagr = None
+    revenue_cagr_3 = None
+    pat_cagr_3 = None
+    eps_cagr_3 = None
 
-    past_row = company_history[
+    revenue_cagr_5 = None
+    pat_cagr_5 = None
+    eps_cagr_5 = None
+
+    revenue_cagr_10 = None
+    pat_cagr_10 = None
+    eps_cagr_10 = None
+
+    # ---------- 3-Year CAGR ----------
+
+    past_row_3 = company_history[
+        company_history["year_num"] == row["year_num"] - 3
+    ]
+
+    if not past_row_3.empty:
+
+        past = past_row_3.iloc[0]
+
+        print("\n===== DEBUG =====")
+        print("Current:", row["year"])
+        print("Past:", past["year"])
+        print("Sales:", past["sales"], "->", row["sales"])
+
+        revenue_cagr_3, flag = calculate_cagr(
+            past["sales"],
+            row["sales"],
+            3,
+        )
+
+        print("Revenue CAGR:", revenue_cagr_3)
+        print("Flag:", flag)
+
+    # ---------- 5-Year CAGR ----------
+
+    past_row_5 = company_history[
         company_history["year_num"] == row["year_num"] - 5
     ]
 
-    if not past_row.empty:
+    if not past_row_5.empty:
 
-        past = past_row.iloc[0]
+        past = past_row_5.iloc[0]
 
-        revenue_cagr, _ = calculate_cagr(
+        revenue_cagr_5, _ = calculate_cagr(
             past["sales"],
             row["sales"],
             5,
         )
 
-        pat_cagr, _ = calculate_cagr(
+        pat_cagr_5, _ = calculate_cagr(
             past["net_profit"],
             row["net_profit"],
             5,
         )
 
-        eps_cagr, _ = calculate_cagr(
+        eps_cagr_5, _ = calculate_cagr(
             past["eps"],
             row["eps"],
             5,
         )
 
+    # ---------- 10-Year CAGR ----------
+
+    past_row_10 = company_history[
+        company_history["year_num"] == row["year_num"] - 10
+    ]
+
+    if not past_row_10.empty:
+
+        past = past_row_10.iloc[0]
+
+        revenue_cagr_10, _ = calculate_cagr(
+            past["sales"],
+            row["sales"],
+            10,
+        )
+
+        pat_cagr_10, _ = calculate_cagr(
+            past["net_profit"],
+            row["net_profit"],
+            10,
+        )
+
+        eps_cagr_10, _ = calculate_cagr(
+            past["eps"],
+            row["eps"],
+            10,
+        )
+
     # ---------- Composite Score ----------
+
     score = 0
 
     if roe is not None and roe > 15:
@@ -359,11 +423,17 @@ def compute_kpis(row, company_history):
 
         "cash_from_operations_cr": row["operating_activity"],
 
-        "revenue_cagr_5yr": revenue_cagr,
+        "revenue_cagr_3yr": revenue_cagr_3,
+        "revenue_cagr_5yr": revenue_cagr_5,
+        "revenue_cagr_10yr": revenue_cagr_10,
 
-        "pat_cagr_5yr": pat_cagr,
+        "pat_cagr_3yr": pat_cagr_3,
+        "pat_cagr_5yr": pat_cagr_5,
+        "pat_cagr_10yr": pat_cagr_10,
 
-        "eps_cagr_5yr": eps_cagr,
+        "eps_cagr_3yr": eps_cagr_3,
+        "eps_cagr_5yr": eps_cagr_5,
+        "eps_cagr_10yr": eps_cagr_10,
 
         "composite_quality_score": score,
 
@@ -382,7 +452,7 @@ def compute_kpis(row, company_history):
         "icr_label": icr_category,
 
         "icr_warning_flag": icr_warning,
-            }
+    }
 
 
 def build_ratio_table(df):
@@ -405,6 +475,7 @@ def build_ratio_table(df):
 
     return result
 
+
 def validate_ratios(df, result):
     """
     Compare calculated ratios with source ratios.
@@ -412,7 +483,6 @@ def validate_ratios(df, result):
     """
 
     issues = []
-
 
     merged = result.merge(
         df[[
@@ -474,6 +544,7 @@ def validate_ratios(df, result):
 
     return issues
 
+
 def write_validation_log(issues):
     """
     Write validation issues to output/ratio_edge_cases.log
@@ -518,6 +589,7 @@ def write_validation_log(issues):
 
             f.write("-" * 60 + "\n")
 
+
 def save_capital_allocation(result):
 
     capital_df = result[
@@ -557,9 +629,17 @@ def save_to_database(result):
             "dividend_payout_ratio_pct",
             "total_debt_cr",
             "cash_from_operations_cr",
+            "revenue_cagr_3yr",
             "revenue_cagr_5yr",
+            "revenue_cagr_10yr",
+
+            "pat_cagr_3yr",
             "pat_cagr_5yr",
+            "pat_cagr_10yr",
+
+            "eps_cagr_3yr",
             "eps_cagr_5yr",
+            "eps_cagr_10yr",
             "composite_quality_score",
         ]
     ]
@@ -625,7 +705,7 @@ if __name__ == "__main__":
                 "capex_label",
                 "fcf_conversion_pct",
                 "capital_allocation_pattern",
-                ]
+            ]
         ].head(20)
     )
 
