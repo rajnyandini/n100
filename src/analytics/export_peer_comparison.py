@@ -2,7 +2,7 @@
 import sqlite3
 import pandas as pd
 from openpyxl.styles import PatternFill
-from src.analytics.peer import compute_peer_percentiles, METRICS
+from src.analytics.peer_engine import compute_peer_percentiles, METRICS
 
 DB = "db/nifty100.db"
 GREEN = PatternFill("solid", fgColor="C6EFCE")

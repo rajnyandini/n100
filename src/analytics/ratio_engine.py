@@ -291,19 +291,23 @@ def compute_kpis(row, company_history):
 
         past = past_row_3.iloc[0]
 
-        print("\n===== DEBUG =====")
-        print("Current:", row["year"])
-        print("Past:", past["year"])
-        print("Sales:", past["sales"], "->", row["sales"])
-
-        revenue_cagr_3, flag = calculate_cagr(
+        revenue_cagr_3, _ = calculate_cagr(
             past["sales"],
             row["sales"],
             3,
         )
 
-        print("Revenue CAGR:", revenue_cagr_3)
-        print("Flag:", flag)
+        pat_cagr_3, _ = calculate_cagr(
+            past["net_profit"],
+            row["net_profit"],
+            3,
+        )
+
+        eps_cagr_3, _ = calculate_cagr(
+            past["eps"],
+            row["eps"],
+            3,
+        )
 
     # ---------- 5-Year CAGR ----------
 

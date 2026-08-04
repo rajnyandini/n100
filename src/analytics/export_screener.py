@@ -2,7 +2,11 @@
 import yaml
 import pandas as pd
 from openpyxl.styles import PatternFill
-from src.screener.engine import load_universe, composite_quality_score, apply_filters
+from src.analytics.screener_engine import (
+    load_universe,
+    composite_quality_score,
+    apply_filters,
+)
 
 GREEN = PatternFill("solid", fgColor="C6EFCE")
 RED = PatternFill("solid", fgColor="FFC7CE")
