@@ -96,3 +96,98 @@ def get_valuation(ticker):
         WHERE company_id=?
         ORDER BY year
     """, [ticker])
+
+@st.cache_data(ttl=600)
+def get_all_ratios():
+    return query("""
+        SELECT *
+        FROM financial_ratios
+    """)
+
+
+@st.cache_data(ttl=600)
+def get_market_cap():
+    return query("""
+        SELECT *
+        FROM market_cap
+    """)
+
+
+@st.cache_data(ttl=600)
+def get_peer_groups():
+    return query("""
+        SELECT *
+        FROM peer_groups
+    """)
+
+
+@st.cache_data(ttl=600)
+def get_company(company_id):
+    return query("""
+        SELECT *
+        FROM companies
+        WHERE id=?
+    """,[company_id])
+
+@st.cache_data(ttl=600)
+def get_dashboard_data():
+    return query("""
+    SELECT
+
+        c.id,
+        c.company_name,
+        c.about_company,
+        c.company_logo,
+
+        c.roce_percentage,
+
+        c.roe_percentage,
+
+        s.broad_sector,
+        s.sub_sector,
+
+        fr.year,
+
+        fr.return_on_equity_pct,
+        fr.net_profit_margin_pct,
+        fr.operating_profit_margin_pct,
+        fr.debt_to_equity,
+        fr.interest_coverage,
+        fr.asset_turnover,
+        fr.free_cash_flow_cr,
+        fr.revenue_cagr_5yr,
+        fr.pat_cagr_5yr,
+        fr.eps_cagr_5yr,
+        fr.composite_quality_score,
+
+        mc.market_cap_crore,
+        mc.pe_ratio,
+        mc.pb_ratio,
+        mc.ev_ebitda,
+        mc.dividend_yield_pct
+
+    FROM financial_ratios fr
+
+    LEFT JOIN companies c
+        ON fr.company_id=c.id
+
+    LEFT JOIN sectors s
+        ON fr.company_id=s.company_id
+
+    LEFT JOIN market_cap mc
+        ON fr.company_id = mc.company_id
+        AND substr(fr.year, -4) = CAST(mc.year AS TEXT)
+    """)
+
+@st.cache_data(ttl=600)
+def get_company_profile(company_id):
+    return query("""
+        SELECT
+            c.*,
+            s.broad_sector,
+            s.sub_sector
+        FROM companies c
+        LEFT JOIN sectors s
+            ON c.id = s.company_id
+        WHERE c.id = ?
+    """, [company_id])
