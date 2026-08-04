@@ -191,3 +191,28 @@ def get_company_profile(company_id):
             ON c.id = s.company_id
         WHERE c.id = ?
     """, [company_id])
+
+@st.cache_data(ttl=600)
+def get_screener_data():
+    return query("""
+        SELECT
+            c.id,
+            c.company_name,
+            s.broad_sector,
+            m.market_cap_crore,
+            m.pe_ratio,
+            m.pb_ratio,
+            r.return_on_equity_pct,
+            r.debt_to_equity,
+            r.composite_quality_score
+        FROM companies c
+
+        LEFT JOIN sectors s
+            ON c.id = s.company_id
+
+        LEFT JOIN market_cap m
+            ON c.id = m.company_id
+
+        LEFT JOIN financial_ratios r
+            ON c.id = r.company_id
+    """)
