@@ -1,157 +1,83 @@
-"""
-Financial Ratio Engine
-Day 11 – Cash Flow KPIs
-"""
+import sqlite3
+import pandas as pd
+from pathlib import Path
+import numpy as np
 
-from typing import Optional
+DB_PATH = "db/nifty100.db"
+OUTPUT_DIR = Path("output")
+OUTPUT_DIR.mkdir(exist_ok=True)
 
+conn = sqlite3.connect(DB_PATH)
 
-def free_cash_flow(
-    operating_activity: float,
-    investing_activity: float
-) -> float:
+cashflow = pd.read_sql(
     """
-    Free Cash Flow (FCF)
+    SELECT
+        company_id,
+        year,
+        operating_activity,
+        investing_activity,
+        financing_activity,
+        net_cash_flow
+    FROM cashflow
+    """,
+    conn
+)
 
-    Formula:
-        CFO + CFI
+conn.close()
 
-    Negative values are allowed.
-    """
+df = cashflow.copy()
 
-    return operating_activity + investing_activity
+# Cash Flow Quality
+df["operating_positive"] = df["operating_activity"] > 0
+df["investing_negative"] = df["investing_activity"] < 0
+df["financing_positive"] = df["financing_activity"] > 0
 
+# Capital Allocation Pattern
+def classify(row):
 
-def cfo_quality_ratio(
-    operating_activity: float,
-    net_profit: float
-) -> Optional[float]:
-    """
-    CFO / PAT
+    o = "+" if row["operating_activity"] >= 0 else "-"
+    i = "+" if row["investing_activity"] >= 0 else "-"
+    f = "+" if row["financing_activity"] >= 0 else "-"
 
-    Return None if PAT == 0
-    """
-
-    if net_profit == 0:
-        return None
-
-    return operating_activity / net_profit
-
-
-def cfo_quality_label(
-    ratio: Optional[float]
-) -> Optional[str]:
-    """
-    Classify CFO Quality.
-
-    > 1.0  -> High Quality
-    0.5-1.0 -> Moderate
-    < 0.5 -> Accrual Risk
-    """
-
-    if ratio is None:
-        return None
-
-    if ratio > 1:
-        return "High Quality"
-
-    if ratio >= 0.5:
-        return "Moderate"
-
-    return "Accrual Risk"
-
-
-def capex_intensity(
-    investing_activity: float,
-    sales: float
-) -> Optional[float]:
-    """
-    CapEx Intensity
-
-    |CFI| / Sales × 100
-    """
-
-    if sales <= 0:
-        return None
-
-    return abs(investing_activity) / sales * 100
-
-
-def capex_label(
-    intensity: Optional[float]
-) -> Optional[str]:
-    """
-    Asset Light
-    Moderate
-    Capital Intensive
-    """
-
-    if intensity is None:
-        return None
-
-    if intensity < 3:
-        return "Asset Light"
-
-    if intensity <= 8:
-        return "Moderate"
-
-    return "Capital Intensive"
-
-
-def fcf_conversion_rate(
-    free_cash_flow_value: float,
-    operating_profit: float
-) -> Optional[float]:
-    """
-    FCF / Operating Profit ×100
-    """
-
-    if operating_profit == 0:
-        return None
-
-    return (
-        free_cash_flow_value /
-        operating_profit
-    ) * 100
-
-
-def capital_allocation_pattern(
-    operating_activity: float,
-    investing_activity: float,
-    financing_activity: float,
-    cfo_quality: Optional[float] = None
-) -> str:
-    """
-    8-pattern capital allocation classifier.
-    """
-
-    cfo = "+" if operating_activity >= 0 else "-"
-    cfi = "+" if investing_activity >= 0 else "-"
-    cff = "+" if financing_activity >= 0 else "-"
-
-    pattern = (cfo, cfi, cff)
+    pattern = (o, i, f)
 
     if pattern == ("+", "-", "-"):
-        if cfo_quality is not None and cfo_quality > 1:
-            return "Shareholder Returns"
-        return "Reinvestor"
+        return "Healthy Reinvestment"
+
+    if pattern == ("+", "-", "+"):
+        return "Growth Funded"
 
     if pattern == ("+", "+", "-"):
-        return "Liquidating Assets"
+        return "Asset Liquidation"
 
     if pattern == ("-", "+", "+"):
-        return "Distress Signal"
-
-    if pattern == ("-", "-", "+"):
-        return "Growth Funded by Debt"
+        return "Financial Distress"
 
     if pattern == ("+", "+", "+"):
         return "Cash Accumulator"
 
-    if pattern == ("-", "-", "-"):
-        return "Pre-Revenue"
+    return "Mixed"
 
-    if pattern == ("+", "-", "+"):
-        return "Mixed"
+df["capital_pattern"] = df.apply(classify, axis=1)
 
-    return "Other"
+# Operating Cash Flow Ratio
+import numpy as np
+
+df["operating_share"] = np.where(
+    df["net_cash_flow"] != 0,
+    (df["operating_activity"] / df["net_cash_flow"]).round(2),
+    np.nan
+)
+
+output_file = OUTPUT_DIR / "cashflow_intelligence.xlsx"
+
+with pd.ExcelWriter(output_file) as writer:
+    df.to_excel(
+        writer,
+        sheet_name="Cash Flow Intelligence",
+        index=False
+    )
+
+print("Cash Flow Intelligence generated.")
+print(f"Rows exported : {len(df)}")
+print(f"Saved -> {output_file}")
