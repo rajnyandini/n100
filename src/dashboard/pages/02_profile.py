@@ -83,32 +83,40 @@ st.caption(
 
 left, right = st.columns([1,4])
 
+
 with left:
 
-    logo = profile.get("company_logo")
+    logo = str(profile.get("company_logo"))
 
-    try:
-        if pd.notna(logo):
-            st.image(logo, width=120)
-        else:
-            raise Exception
-    except:
-        initials = "".join(word[0] for word in profile["company_name"].split()[:2])
+    if "economictimes.com" in logo.lower():
+
+        st.image(
+            logo,
+            width=120
+        )
+
+    else:
+
+        initials = "".join(
+            word[0].upper()
+            for word in profile["company_name"].split()[:2]
+        )
 
         st.markdown(
             f"""
             <div style="
-            width:120px;
-            height:120px;
-            border-radius:16px;
-            background:#1f2937;
-            display:flex;
-            justify-content:center;
-            align-items:center;
-            font-size:42px;
-            font-weight:bold;
-            color:white;">
-            {initials}
+                width:120px;
+                height:120px;
+                border-radius:16px;
+                background:#1f2937;
+                display:flex;
+                justify-content:center;
+                align-items:center;
+                font-size:42px;
+                font-weight:bold;
+                color:white;
+                border:1px solid #374151;">
+                {initials}
             </div>
             """,
             unsafe_allow_html=True
@@ -121,12 +129,10 @@ with right:
     st.write(profile["about_company"])
 
     if pd.notna(profile["website"]):
-
         st.link_button(
             "Visit Website",
             profile["website"]
         )
-
 st.divider()
 
 c1,c2,c3,c4,c5,c6 = st.columns(6)
