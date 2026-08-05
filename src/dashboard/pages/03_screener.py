@@ -18,7 +18,7 @@ st.set_page_config(
 
 load_css()
 
-st.title("🔎 Stock Screener")
+st.title("Stock Screener")
 
 df = get_screener_data()
 
