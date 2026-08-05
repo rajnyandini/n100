@@ -60,6 +60,13 @@ elif report_type == "Financial Ratios":
 else:
     report = valuation
 
+st.subheader(report_type)
+st.caption(f"{len(report)} records")
+
+if report.empty:
+    st.warning(f"No {report_type.lower()} available for this company.")
+    st.stop()
+
 st.dataframe(
     report,
     use_container_width=True,
@@ -68,8 +75,10 @@ st.dataframe(
 
 st.download_button(
     "⬇ Download CSV",
-    report.to_csv(index=False),
-    file_name=f"{company}_{report_type}.csv",
+    report.to_csv(index=False).encode("utf-8"),
+    file_name=(
+        f"{company.replace(' ', '_')}_"
+        f"{report_type.replace(' ', '_')}.csv"
+    ),
     mime="text/csv"
 )
-
